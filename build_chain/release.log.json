@@ -1,0 +1,16 @@
+{
+  "releases": {
+    "1.112.0": {
+      "versionCode": 0,
+      "date": "2021-05-01"
+    }
+  },
+  "prs": {
+    "2": {
+      "title": "Initial Comit",
+      "branch": "BRAAVOS",
+      "release": "1.112.0",
+      "omit": true
+    }
+  }
+}

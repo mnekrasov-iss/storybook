@@ -1,0 +1,80 @@
+# This workflow will build and test a feature branch
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+    branches: # For pull_request events the branches list is the target of the pull request not the source
+      - master
+      - develop
+    paths-ignore:
+      - "**/*.md"
+      - "*.md"
+
+name: Pull Request
+
+env:
+  NODE_VER: 14.x
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup Node.js ${{ env.NODE_VER }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ env.NODE_VER }}
+
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Get Yarn Cache
+        uses: actions/cache@v2
+        with:
+          path: "**/node_modules"
+          key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
+
+      - name: Install Packages
+        run: yarn install
+
+      - name: ESLint Check
+        run: $(npm bin)/eslint .
+
+      - name: Test
+        env:
+          CI: true
+        run: yarn test --passWithNoTests
+
+  build:
+    name: Build
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup Node.js ${{ env.NODE_VER }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ env.NODE_VER }}
+
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Get Yarn Cache
+        uses: actions/cache@v2
+        with:
+          path: "**/node_modules"
+          key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
+
+      - name: Install Packages
+        run: yarn install
+
+      - name: Build
+        run: yarn build

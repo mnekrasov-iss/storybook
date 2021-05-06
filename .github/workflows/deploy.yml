@@ -1,0 +1,112 @@
+# This workflow will build and push the react app to S3 and invalidate
+# the CloudFront distribution
+
+on:
+  workflow_dispatch:
+  push:
+    paths-ignore:
+      - ".github/**"
+      - "!.github/workflows/deploy.yml"
+      - "**/*.md"
+      - "*.md"
+    branches:
+      - develop
+      - master
+
+name: Build React App and Deploy to S3
+
+env:
+  PROJ_NAME: alexandria
+  NODE_VER: 14.x
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup Node.js ${{ env.NODE_VER }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ env.NODE_VER }}
+
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Get Yarn Cache
+        uses: actions/cache@v2
+        with:
+          path: "**/node_modules"
+          key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
+
+      - name: Install Packages
+        run: yarn install
+
+      - name: Test
+        env:
+          CI: true
+        run: yarn test --passWithNoTests
+
+  deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Set Deployment Env (Production)
+        if: github.ref == 'refs/heads/master'
+        run: echo "DEPLOY_ENV=prod" >> $GITHUB_ENV
+
+      - name: Set Deployment Env (Stage)
+        if: github.ref == 'refs/heads/develop'
+        run: echo "DEPLOY_ENV=stage" >> $GITHUB_ENV
+
+      - name: Set Deployment Env (Development)
+        if: github.event_name == 'workflow_dispatch' || (github.ref != 'refs/heads/develop' && github.ref != 'refs/heads/master')
+        run: echo "DEPLOY_ENV=dev" >> $GITHUB_ENV
+
+      - name: Setup Node.js ${{ env.NODE_VER }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ env.NODE_VER }}
+
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Get Yarn Cache
+        uses: actions/cache@v2
+        with:
+          path: "**/node_modules"
+          key: ${{ runner.os }}-modules-${{ hashFiles('**/yarn.lock') }}
+
+      - name: Install Packages
+        run: yarn install
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Get Parameters
+        id: get-parameter
+        run: |
+          echo "::set-output name=bucket::$(aws ssm get-parameter --name /$PROJ_NAME/$DEPLOY_ENV/s3/name --output text --query Parameter.Value)"
+          echo "::set-output name=distribution_id::$(aws ssm get-parameter --name /$PROJ_NAME/$DEPLOY_ENV/cloudfront/distribution --output text --query Parameter.Value)"
+
+      - name: Build
+        id: build-react
+        run: |
+          yarn build
+
+      - name: Sync to S3 Bucket
+        id: sync-s3
+        run: |
+          echo ${{ steps.get-parameter.outputs.bucket }}
+          aws s3 sync ./build/ s3://${{ steps.get-parameter.outputs.bucket }}/ --delete
+
+      - name: Invalidate CloudFront Distribution
+        id: invalidate-cloudfront
+        run: |
+          aws cloudfront create-invalidation --distribution-id ${{ steps.get-parameter.outputs.distribution_id }} --paths "/"
