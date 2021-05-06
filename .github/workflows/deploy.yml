@@ -104,7 +104,7 @@ jobs:
         id: sync-s3
         run: |
           echo ${{ steps.get-parameter.outputs.bucket }}
-          aws s3 sync ./build/ s3://${{ steps.get-parameter.outputs.bucket }}/ --delete
+          aws s3 sync ./storybook-static/ s3://${{ steps.get-parameter.outputs.bucket }}/ --delete
 
       - name: Invalidate CloudFront Distribution
         id: invalidate-cloudfront

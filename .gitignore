@@ -173,5 +173,5 @@ web-build/
 /build_chain/credentials.sentry.json
 /build_chain/credentials.aws.json
 
-# Temp files
-data/*.csv
+# Storybook
+storybook-static/
