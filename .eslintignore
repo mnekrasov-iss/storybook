@@ -1,0 +1,8 @@
+node_modules/*
+.expo/*
+.github/*
+dist/*
+web-build/*
+android/*
+ios/*
+coverage/*
